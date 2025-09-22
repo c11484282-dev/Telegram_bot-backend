@@ -1,0 +1,38 @@
+# Use an official Python runtime as a parent image
+FROM python:3.13.4-slim AS builder
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the current directory contents into the container at /app
+COPY . /app
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install sqlite3
+RUN apt-get update && apt-get install -y sqlite3
+
+# Build the application
+RUN python database_setup.py
+
+# Use a minimal Python runtime as the final image
+FROM python:3.13.4-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the built application from the builder stage
+COPY --from=builder /app /app
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Make port 80 available to the world outside this container
+EXPOSE 80
+
+# Define environment variable
+ENV NAME World
+
+# Run main.py when the container launches
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
