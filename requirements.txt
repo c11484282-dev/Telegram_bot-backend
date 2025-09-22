@@ -4,3 +4,5 @@ gunicorn==23.0.0
 python-dotenv==1.0.1
 pyTelegramBotAPI==4.22.1
 requests==2.32.3
+sqlalchemy==2.0.20
+psycopg2-binary==2.9.9
