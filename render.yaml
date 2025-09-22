@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: fastapi
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BOT_TOKEN
+        fromSecret: bot-token
+      - key: ADMIN_USER_ID
+        fromSecret: admin-user-id
+      - key: WEBHOOK_URL
+        fromSecret: webhook-url
+      - key: OPENAI_API_KEY
+        fromSecret: openai-api-key
+      - key: MINIAPP_URL
+        fromSecret: miniapp-url
+      - key: DATABASE_URL
+        fromSecret: database-url
