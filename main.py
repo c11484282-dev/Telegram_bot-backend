@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import requests
 import json
 from collections import defaultdict
+from sqlalchemy import create_engine, Column, Integer, String, Text, TIMESTAMP, ForeignKey, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 # Load environment variables
 load_dotenv()
@@ -14,16 +17,23 @@ ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID"))
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 MINIAPP_URL = os.getenv("MINIAPP_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Initialize FastAPI and Telebot
 app = FastAPI()
 bot = telebot.TeleBot(BOT_TOKEN)
 
+# Database setup
+Base = declarative_base()
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base.metadata.create_all(bind=engine)
+
 # In-memory leaderboard (user_id: quiz_count)
 leaderboard = defaultdict(int)
 
 # Available quiz topics
-QUIZ_TOPICS = ["roblox","minecraft","python","hacking","general knowledge"]
+QUIZ_TOPICS = ["roblox", "minecraft", "python", "hacking", "general knowledge"]
 
 # Set webhook
 bot.remove_webhook()
@@ -31,14 +41,15 @@ bot.set_webhook(url=WEBHOOK_URL)
 
 # Helper function to call OpenAI for quiz generation
 async def generate_quiz(topic, difficulty):
-    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}","Content-Type":"application/json"}
-    payload = {"model":"gpt-4o-mini","messages": [
-            {"role":"user","content": f"Generate a {difficulty} quiz question about {topic} with 4 answer options and the correct answer."}
-        ]}    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+    headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+    payload = {"model": "gpt-4o-mini", "messages": [
+        {"role": "user", "content": f"Generate a {difficulty} quiz question about {topic} with 4 answer options and the correct answer."}
+    ]}
+    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
     if response.status_code == 200:
         result = response.json()
         return result["choices"][0]["message"]["content"]
-    return"Error generating quiz."
+    return "Error generating quiz."
 
 # Handle /start command
 @bot.message_handler(commands=['start'])
@@ -53,8 +64,8 @@ def handle_start(message):
 @bot.message_handler(commands=['newquiz'])
 def handle_newquiz(message):
     args = message.text.split()[1:]
-    topic = args[0] if len(args) > 0 else"roblox"
-    difficulty = args[1] if len(args) > 1 else"hard"
+    topic = args[0] if len(args) > 0 else "roblox"
+    difficulty = args[1] if len(args) > 1 else "hard"
     if topic.lower() not in QUIZ_TOPICS:
         bot.reply_to(message, f"Invalid topic. Use /categories to see available topics.")
         return
@@ -67,9 +78,9 @@ def handle_newquiz(message):
 @bot.message_handler(commands=['admindash'])
 def handle_admindash(message):
     if message.from_user.id == ADMIN_USER_ID:
-        bot.reply_to(message,"Admin Dashboard: All systems operational. Use /newquiz, /leaderboard, or Mini App for quizzes.")
+        bot.reply_to(message, "Admin Dashboard: All systems operational. Use /newquiz, /leaderboard, or Mini App for quizzes.")
     else:
-        bot.reply_to(message,"Access denied. Admin only.")
+        bot.reply_to(message, "Access denied. Admin only.")
 
 # Handle /getwebhookinfo command
 @bot.message_handler(commands=['getwebhookinfo'])
@@ -78,16 +89,16 @@ def handle_webhookinfo(message):
         webhook_info = bot.get_webhook_info()
         bot.reply_to(message, f"Webhook Info: {json.dumps(webhook_info.__dict__, indent=2)}")
     else:
-        bot.reply_to(message,"Access denied. Admin only.")
+        bot.reply_to(message, "Access denied. Admin only.")
 
 # Handle /leaderboard command
 @bot.message_handler(commands=['leaderboard'])
 def handle_leaderboard(message):
     if not leaderboard:
-        bot.reply_to(message,"No quiz completions yet. Start with /newquiz!")
+        bot.reply_to(message, "No quiz completions yet. Start with /newquiz!")
         return
     sorted_leaders = sorted(leaderboard.items(), key=lambda x: x[1], reverse=True)[:5]
-    response ="🏆 Leaderboard (Top 5 Quiz Takers):\n"
+    response = "🏆 Leaderboard (Top 5 Quiz Takers):\n"
     for user_id, count in sorted_leaders:
         user_info = bot.get_chat_member(message.chat.id, user_id).user
         username = user_info.username or user_info.first_name
@@ -97,7 +108,7 @@ def handle_leaderboard(message):
 # Handle /categories command
 @bot.message_handler(commands=['categories'])
 def handle_categories(message):
-    response ="Available quiz topics:\n" +"\n".join(f"- {topic}" for topic in QUIZ_TOPICS)
+    response = "Available quiz topics:\n" + "\n".join(f"- {topic}" for topic in QUIZ_TOPICS)
     bot.reply_to(message, response)
 
 # Handle /help command
@@ -137,4 +148,4 @@ async def webhook(request: Request):
 # Health check endpoint
 @app.get("/health")
 async def health():
-    return {"status":"healthy"}
+    return {"status": "healthy"}
